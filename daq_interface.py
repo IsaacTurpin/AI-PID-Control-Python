@@ -4,7 +4,7 @@ from nidaqmx.system import System
 
 class DAQInterface:
     def __init__(self):
-        self.system: System = nidaqmx.system.System.local()  # Explicitly declare type
+        self.system: System = nidaqmx.system.System.local()
 
     def get_available_devices(self) -> list[str]:
         """Return a list of available DAQ devices."""
@@ -13,9 +13,15 @@ class DAQInterface:
     def get_available_channels(self, device_name: str, channel_type: str = "ai") -> list[str]:
         """Return a list of available channels for a given device."""
         if channel_type == "ai":
-            return [f"{device_name}/{chan.name}" for chan in self.system.devices[device_name].ai_physical_chans]
+            # Get the physical channels for the device
+            physical_chans = self.system.devices[device_name].ai_physical_chans
+            # Construct channel names without prepending the device name again
+            return [chan.name for chan in physical_chans]
         elif channel_type == "ao":
-            return [f"{device_name}/{chan.name}" for chan in self.system.devices[device_name].ao_physical_chans]
+            # Get the physical channels for the device
+            physical_chans = self.system.devices[device_name].ao_physical_chans
+            # Construct channel names without prepending the device name again
+            return [chan.name for chan in physical_chans]
         else:
             raise ValueError("Invalid channel type. Use 'ai' or 'ao'.")
 
