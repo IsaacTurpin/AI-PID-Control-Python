@@ -2,9 +2,9 @@ import time
 
 class PIDController:
     def __init__(self):
-        self.Kp = 0.85  # Proportional gain
-        self.Ki = 0.9  # Integral gain
-        self.Kd = 0.03   # Derivative gain
+        self.Kp = 0.3  # Proportional gain (adjusted)
+        self.Ki = 0.1  # Integral gain (adjusted)
+        self.Kd = 0.02  # Derivative gain (adjusted)
         self.setpoint = 0.0
         self.previous_error = 0.0
         self.previous_measured = 0.0
@@ -33,13 +33,18 @@ class PIDController:
         # Proportional term
         proportional = self.Kp * error
 
-        # Integral term with proper anti-windup
+        # Integral term with improved anti-windup
         self.integral += error * dt
         integral = self.Ki * self.integral
-        integral = max(-1.0, min(integral, 1.0))  # Limit integral contribution
 
-        # Derivative term (on measured value)
-        derivative = -self.Kd * (measured_value - self.previous_measured) / dt
+        # Ensure integral stays within output limits to prevent windup
+        if integral > self.output_max:
+            integral = self.output_max
+        elif integral < self.output_min:
+            integral = self.output_min
+
+        # Derivative term based on error change, not measured value
+        derivative = self.Kd * (error - self.previous_error) / dt
 
         # Compute final PID output
         output = proportional + integral + derivative
@@ -47,9 +52,16 @@ class PIDController:
         # Clamp output to valid range
         output = max(self.output_min, min(output, self.output_max))
 
+        # Adjust integral term to avoid windup during saturation
+        if output == self.output_max:
+            self.integral -= error * dt  # Undo integral buildup if output is maxed
+        elif output == self.output_min:
+            self.integral += error * dt  # Undo integral buildup if output is min
+
         # Store previous values
         self.previous_error = error
         self.previous_measured = measured_value
         self.last_time = current_time
 
         return output
+
