@@ -2,9 +2,9 @@ import time
 
 class PIDController:
     def __init__(self):
-        self.Kp = 0.3  # Proportional gain (adjusted)
-        self.Ki = 0.1  # Integral gain (adjusted)
-        self.Kd = 0.02  # Derivative gain (adjusted)
+        self.Kp = 0.3  # Proportional gain
+        self.Ki = 0.1  # Integral gain
+        self.Kd = 0.02  # Derivative gain
         self.setpoint = 0.0
         self.previous_error = 0.0
         self.previous_measured = 0.0
