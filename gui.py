@@ -1,4 +1,4 @@
-from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QSlider, QLabel, QLineEdit, QPushButton, QComboBox
+from PyQt5.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QDoubleSpinBox, QSlider, QLabel, QLineEdit, QPushButton, QComboBox
 from PyQt5.QtCore import Qt
 from daq_worker import DAQWorker
 from daq_interface import DAQInterface
@@ -17,15 +17,16 @@ class PIDControllerGUI(QMainWindow):
         # Desired Voltage Slider
         self.desired_voltage_label = QLabel("Desired Voltage (V): 0.0")
         self.layout.addWidget(self.desired_voltage_label)
-        self.desired_voltage_slider = QSlider(Qt.Horizontal)
-        self.desired_voltage_slider.setRange(0, 10)  # 0V to 10V range
-        self.desired_voltage_slider.valueChanged[int].connect(self.update_desired_voltage)
-        self.layout.addWidget(self.desired_voltage_slider)
+        self.desired_voltage_spinbox = QDoubleSpinBox()
+        self.desired_voltage_spinbox.setRange(0.0, 10.0)  # Range from 0.0V to 10.0V
+        self.desired_voltage_spinbox.setSingleStep(0.1)  # Increment by 0.1V
+        self.desired_voltage_spinbox.valueChanged[float].connect(self.update_desired_voltage)
+        self.layout.addWidget(self.desired_voltage_spinbox)
 
         # Sampling Rate Input
         self.sampling_rate_label = QLabel("Sampling Rate (Hz):")
         self.layout.addWidget(self.sampling_rate_label)
-        self.sampling_rate_input = QLineEdit("100")  # Default sampling rate
+        self.sampling_rate_input = QLineEdit("1000")  # Default sampling rate
         self.layout.addWidget(self.sampling_rate_input)
 
         # DAQ Device Selection
@@ -69,12 +70,6 @@ class PIDControllerGUI(QMainWindow):
         # DAQ Worker
         self.daq_worker = None
 
-        # Add a method to update the output voltage
-        self.update_output_voltage(0.0)  # Initialize output voltage to 0.0
-
-        # Connect the slider to the output voltage update
-        self.desired_voltage_slider.valueChanged[int].connect(self.update_desired_voltage)
-
     def populate_daq_devices(self):
         """Populate the DAQ device dropdown with available devices."""
         devices = self.daq_interface.get_available_devices()
@@ -96,11 +91,11 @@ class PIDControllerGUI(QMainWindow):
             self.output_channel_dropdown.clear()
             self.output_channel_dropdown.addItems(output_channels)
 
-    def update_desired_voltage(self, value: int):
-        """Slot for updating the desired voltage label and output voltage."""
-        desired_voltage = value  # No division needed since the slider range is already 0-10
-        self.desired_voltage_label.setText(f"Desired Voltage (V): {desired_voltage:.1f}")
-        self.update_output_voltage(desired_voltage)  # Pass the desired voltage to the DAQWorker
+    def update_desired_voltage(self, value: float):
+        """Slot for updating the desired voltage label and setpoint."""
+        self.desired_voltage_label.setText(f"Desired Voltage (V): {value:.1f}")
+        if self.daq_worker is not None and self.daq_worker.isRunning():
+            self.daq_worker.set_setpoint(value)
 
     def start_daq(self):
         """Start the DAQ worker thread."""
@@ -110,17 +105,21 @@ class PIDControllerGUI(QMainWindow):
             sampling_rate = int(self.sampling_rate_input.text())
             if input_channel and output_channel and sampling_rate > 0:
                 # Get the initial slider value
-                initial_voltage = self.desired_voltage_slider.value()
+                initial_setpoint = self.desired_voltage_spinbox.value()
+
+                # Create and start the DAQ worker
                 self.daq_worker = DAQWorker(input_channel, output_channel, sampling_rate)
                 self.daq_worker.voltage_measured.connect(self.update_input_voltage)
+                self.daq_worker.output_voltage_updated.connect(self.update_output_voltage)
                 self.daq_worker.start()
 
-                # Set the initial output voltage
-                self.update_output_voltage(initial_voltage)
+                # Set the initial setpoint
+                self.daq_worker.set_setpoint(initial_setpoint)
 
     def stop_daq(self):
         """Stop the DAQ worker thread."""
         if self.daq_worker is not None and self.daq_worker.isRunning():
+            print("Stopping DAQ worker...")  # Debug statement
             self.daq_worker.stop()
             self.daq_worker.quit()
             self.daq_worker.wait()
@@ -130,16 +129,8 @@ class PIDControllerGUI(QMainWindow):
         self.current_input_voltage_label.setText(f"Current Input Voltage (V): {voltage:.3f}")
 
     def update_output_voltage(self, voltage: float):
-        """Update the output voltage (clamped to the valid range)."""
-        if self.daq_worker is not None and self.daq_worker.isRunning():
-            # Clamp the voltage to the valid range
-            clamped_voltage = max(0.0, min(voltage, 5.0))  # Adjust based on your DAQ device
-            self.daq_worker.set_output_voltage(clamped_voltage)
-            self.current_output_voltage_label.setText(f"Current Output Voltage (V): {clamped_voltage:.3f}")
-
-            # Inform the user if the desired voltage is out of range
-            if voltage < 0.0 or voltage > 5.0:
-                print(f"Warning: Desired voltage {voltage:.3f}V is out of range. Clamped to {clamped_voltage:.3f}V.")
+        """Update the output voltage label."""
+        self.current_output_voltage_label.setText(f"Current Output Voltage (V): {voltage:.3f}")
 
 if __name__ == "__main__":
     app = QApplication([])
