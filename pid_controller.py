@@ -1,51 +1,55 @@
+import time
+
 class PIDController:
     def __init__(self):
-        self.Kp = 1.0  # Proportional gain
-        self.Ki = 0.05  # Integral gain
-        self.Kd = 0.2  # Derivative gain
-        self.setpoint = 0.0  # Desired voltage
+        self.Kp = 0.85  # Proportional gain
+        self.Ki = 0.9  # Integral gain
+        self.Kd = 0.03   # Derivative gain
+        self.setpoint = 0.0
         self.previous_error = 0.0
+        self.previous_measured = 0.0
         self.integral = 0.0
-        self.output_min = 0.0  # Minimum output voltage
-        self.output_max = 5.0  # Maximum output voltage
+        self.output_min = 0.0
+        self.output_max = 5.0
+        self.last_time = time.time()
 
     def set_setpoint(self, setpoint: float):
         """Set the desired voltage (setpoint) and reset PID terms."""
         self.setpoint = setpoint
-        self.previous_error = 0.0  # Reset previous error
-        self.integral = 0.0  # Reset integral term
+        self.previous_error = 0.0
+        self.previous_measured = 0.0
+        self.integral = 0.0
+        self.last_time = time.time()
 
     def compute(self, measured_value: float) -> float:
         """Compute the PID output based on the measured value."""
-        error = self.setpoint - measured_value
+        current_time = time.time()
+        dt = current_time - self.last_time
+        if dt <= 0:  # Prevent division by zero
+            dt = 1e-3  # Smallest reasonable time step
 
-        # Debug: Print the error
-        print(f"Error: {error:.3f}V")
+        error = self.setpoint - measured_value
 
         # Proportional term
         proportional = self.Kp * error
 
-        # Integral term with anti-windup
-        self.integral += error
-        if self.integral > self.output_max:
-            self.integral = self.output_max
-        elif self.integral < self.output_min:
-            self.integral = self.output_min
+        # Integral term with proper anti-windup
+        self.integral += error * dt
         integral = self.Ki * self.integral
+        integral = max(-1.0, min(integral, 1.0))  # Limit integral contribution
 
-        # Derivative term
-        derivative = self.Kd * (error - self.previous_error)
+        # Derivative term (on measured value)
+        derivative = -self.Kd * (measured_value - self.previous_measured) / dt
 
-        # PID output
+        # Compute final PID output
         output = proportional + integral + derivative
 
-        # Debug: Print the PID terms
-        print(f"Proportional: {proportional:.3f}, Integral: {integral:.3f}, Derivative: {derivative:.3f}")
-
-        # Clamp the output to the valid range
+        # Clamp output to valid range
         output = max(self.output_min, min(output, self.output_max))
 
-        # Update previous error
+        # Store previous values
         self.previous_error = error
+        self.previous_measured = measured_value
+        self.last_time = current_time
 
         return output

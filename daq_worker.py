@@ -60,6 +60,7 @@ class DAQWorker(QThread):
                             # Use the last sample for PID control
                             last_sample = input_voltage[-1]
                             self.voltage_measured.emit(last_sample)  # Emit the measured voltage
+                            print(f"Writing input voltage: {last_sample:.3f}V")
 
                             # Compute the PID output
                             output_voltage = self.pid_controller.compute(last_sample)
