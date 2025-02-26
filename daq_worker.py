@@ -2,10 +2,13 @@ from PyQt5.QtCore import QThread, pyqtSignal
 import nidaqmx
 from nidaqmx.constants import TerminalConfiguration, AcquisitionType
 import time
+from pid_controller import PIDController
 
 class DAQWorker(QThread):
     # Signal to send the measured voltage to the GUI
     voltage_measured = pyqtSignal(float)
+    # Signal to send the output voltage to the GUI
+    output_voltage_updated = pyqtSignal(float)
 
     def __init__(self, input_channel: str, output_channel: str, sampling_rate: int):
         super().__init__()
@@ -15,7 +18,8 @@ class DAQWorker(QThread):
         self.running = False
         self.output_voltage = 0.0  # Initial output voltage
         self.output_min_voltage = 0.0  # Minimum output voltage
-        self.output_max_voltage = 5.0  # Maximum output voltage (adjust based on your DAQ device)
+        self.output_max_voltage = 5.0  # Maximum output voltage
+        self.pid_controller = PIDController()  # PID controller
 
     def run(self):
         """Main loop to read input voltage and write output voltage."""
@@ -50,15 +54,32 @@ class DAQWorker(QThread):
                 # Main loop for continuous reading and writing
                 while self.running:
                     try:
-                        # Read a single sample from the AI task
-                        input_voltage = input_task.read(number_of_samples_per_channel=1)
-                        self.voltage_measured.emit(input_voltage[0])  # Emit the measured voltage
+                        # Read 1000 samples from the AI task
+                        input_voltage = input_task.read(number_of_samples_per_channel=1000)
+                        if input_voltage:  # Ensure data is not empty
+                            # Use the last sample for PID control
+                            last_sample = input_voltage[-1]
+                            self.voltage_measured.emit(last_sample)  # Emit the measured voltage
 
-                        # Debug: Print the clamped output voltage
-                        print(f"Writing output voltage: {self.output_voltage:.3f}V")
+                            # Compute the PID output
+                            output_voltage = self.pid_controller.compute(last_sample)
 
-                        # Write the output voltage to the AO task (on-demand)
-                        output_task.write(self.output_voltage)
+                            # Clamp the output voltage to the valid range
+                            clamped_voltage = max(self.output_min_voltage, min(output_voltage, self.output_max_voltage))
+
+                            # Emit the output voltage to the GUI
+                            self.output_voltage_updated.emit(clamped_voltage)
+
+                            # Write the output voltage to the AO task (on-demand)
+                            output_task.write(clamped_voltage)
+                    except nidaqmx.DaqError as e:
+                        if e.error_code == -200279:  # Buffer overflow error
+                            print("Buffer overflow detected. Reducing sampling rate or increasing buffer size.")
+                            self.sampling_rate = max(10, self.sampling_rate // 2)  # Reduce sampling rate by half
+                            print(f"New sampling rate: {self.sampling_rate} Hz")
+                        else:
+                            print(f"Error in DAQ operation: {e}")
+                            self.running = False
                     except Exception as e:
                         print(f"Error in DAQ operation: {e}")
                         self.running = False
@@ -66,15 +87,18 @@ class DAQWorker(QThread):
                     # Sleep to respect the sampling rate
                     time.sleep(1.0 / self.sampling_rate)
 
+            except Exception as e:
+                print(f"Error in task configuration: {e}")  # Debug statement
+                self.running = False
+
             finally:
-                # Stop and clear tasks
+                print("Stopping tasks...")  # Debug statement
                 input_task.stop()
                 output_task.stop()
 
-    def set_output_voltage(self, voltage: float):
-        """Set the output voltage (clamped to the valid range)."""
-        self.output_voltage = max(self.output_min_voltage, min(voltage, self.output_max_voltage))
-        print(f"Output voltage set to: {self.output_voltage:.3f}V")  # Debug statement
+    def set_setpoint(self, setpoint: float):
+        """Set the desired voltage (setpoint) for the PID controller."""
+        self.pid_controller.setpoint = setpoint
 
     def stop(self):
         """Stop the worker thread."""
