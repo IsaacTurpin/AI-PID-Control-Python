@@ -2,6 +2,7 @@ import time
 
 class PIDController:
     def __init__(self):
+        # Configured for NI USB-6009
         self.Kp = 0.3  # Proportional gain
         self.Ki = 0.1  # Integral gain
         self.Kd = 0.02  # Derivative gain

@@ -15,12 +15,12 @@ class DAQInterface:
         if channel_type == "ai":
             # Get the physical channels for the device
             physical_chans = self.system.devices[device_name].ai_physical_chans
-            # Construct channel names without prepending the device name again
+            # Construct channel names
             return [chan.name for chan in physical_chans]
         elif channel_type == "ao":
             # Get the physical channels for the device
             physical_chans = self.system.devices[device_name].ao_physical_chans
-            # Construct channel names without prepending the device name again
+            # Construct channel names
             return [chan.name for chan in physical_chans]
         else:
             raise ValueError("Invalid channel type. Use 'ai' or 'ao'.")

@@ -14,11 +14,11 @@ class PIDControllerGUI(QMainWindow):
         self.setCentralWidget(self.main_widget)
         self.layout = QVBoxLayout(self.main_widget)
 
-        # Desired Voltage Slider
+        # Desired Voltage Input
         self.desired_voltage_label = QLabel("Desired Voltage (V): 0.0")
         self.layout.addWidget(self.desired_voltage_label)
         self.desired_voltage_spinbox = QDoubleSpinBox()
-        self.desired_voltage_spinbox.setRange(0.0, 10.0)  # Range from 0.0V to 10.0V
+        self.desired_voltage_spinbox.setRange(0.0, 5.0)  # Range from 0.0V to 5.0V
         self.desired_voltage_spinbox.setSingleStep(0.1)  # Increment by 0.1V
         self.desired_voltage_spinbox.valueChanged[float].connect(self.update_desired_voltage)
         self.layout.addWidget(self.desired_voltage_spinbox)
@@ -104,7 +104,7 @@ class PIDControllerGUI(QMainWindow):
             output_channel = self.output_channel_dropdown.currentText()
             sampling_rate = int(self.sampling_rate_input.text())
             if input_channel and output_channel and sampling_rate > 0:
-                # Get the initial slider value
+                # Get the initial input value
                 initial_setpoint = self.desired_voltage_spinbox.value()
 
                 # Create and start the DAQ worker

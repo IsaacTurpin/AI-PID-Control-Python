@@ -57,7 +57,7 @@ class DAQWorker(QThread):
                         # Read 1000 samples from the AI task
                         input_voltage = input_task.read(number_of_samples_per_channel=1000)
                         if input_voltage:  # Ensure data is not empty
-                            # Use the last sample for PID control
+                            # Use the last sample for PID control, 1 sample
                             last_sample = input_voltage[-1]
                             self.voltage_measured.emit(last_sample)  # Emit the measured voltage
 
